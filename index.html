@@ -3,17 +3,16 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Infinite Space Zoom</title>
+<title>Infinite Zoom Universe with Easter Eggs</title>
 <style>
   html, body { margin:0; height:100%; overflow:hidden; background:black; }
   canvas { display:block; }
 </style>
 </head>
 <body>
-<canvas id="spaceCanvas"></canvas>
-
+<canvas id="canvas"></canvas>
 <script>
-const canvas = document.getElementById("spaceCanvas");
+const canvas = document.getElementById("canvas");
 const ctx = canvas.getContext("2d");
 let width = canvas.width = window.innerWidth;
 let height = canvas.height = window.innerHeight;
@@ -23,58 +22,65 @@ window.addEventListener("resize", () => {
   height = canvas.height = window.innerHeight;
 });
 
-// Layers of space images (you can replace with your own)
-const layers = [
-  { src: "images/stars.png", scale: 1 },
-  { src: "images/galaxy.png", scale: 0.5 },
-  { src: "images/universe.png", scale: 0.2 }
-];
+// Camera
+let camera = { x: width/2, y: height/2, zoom: 1 };
 
-layers.forEach(layer => {
-  layer.img = new Image();
-  layer.img.src = layer.src;
-});
-
-// Zoom control
-let zoom = 1;
-let offsetX = width/2;
-let offsetY = height/2;
-
+// Mouse wheel zoom
 canvas.addEventListener("wheel", e => {
   e.preventDefault();
   const zoomFactor = 1.1;
-  const mouseX = e.clientX;
-  const mouseY = e.clientY;
+  const mx = e.clientX;
+  const my = e.clientY;
 
-  // Center zoom on cursor
-  offsetX = mouseX - ((mouseX - offsetX)/zoom) * (zoom * (e.deltaY < 0 ? zoomFactor : 1/zoomFactor));
-  offsetY = mouseY - ((mouseY - offsetY)/zoom) * (zoom * (e.deltaY < 0 ? zoomFactor : 1/zoomFactor));
-
-  zoom *= (e.deltaY < 0 ? zoomFactor : 1/zoomFactor);
+  camera.x = mx - ((mx - camera.x)/camera.zoom) * (camera.zoom * (e.deltaY < 0 ? zoomFactor : 1/zoomFactor));
+  camera.y = my - ((my - camera.y)/camera.zoom) * (camera.zoom * (e.deltaY < 0 ? zoomFactor : 1/zoomFactor));
+  camera.zoom *= (e.deltaY < 0 ? zoomFactor : 1 / zoomFactor);
 });
 
-// Draw loop
+// Procedural drawing
+function drawStars(levelScale) {
+  const count = Math.floor(200 * levelScale);
+  for (let i=0; i<count; i++) {
+    const x = (Math.random()-0.5) * width * 10;
+    const y = (Math.random()-0.5) * height * 10;
+    const size = Math.random() * 2 * levelScale;
+    ctx.fillStyle = `rgba(255,255,255,${Math.random()})`;
+    ctx.beginPath();
+    ctx.arc(x, y, size, 0, Math.PI*2);
+    ctx.fill();
+  }
+}
+
+function drawEasterEggs(levelScale) {
+  const count = Math.floor(5 * levelScale); // few Easter eggs per zoom
+  for (let i=0; i<count; i++) {
+    const x = (Math.random()-0.5) * width * 10;
+    const y = (Math.random()-0.5) * height * 10;
+    ctx.fillStyle = "yellow";
+    ctx.font = `${20 * levelScale}px Arial`;
+    ctx.fillText("⭐", x, y); // Easter egg emoji
+  }
+}
+
+// Recursive zoom layers
+function drawLayer(level) {
+  const levelScale = Math.pow(0.5, level); // smaller scales deeper
+  drawStars(levelScale);
+  if (level > 2) drawEasterEggs(levelScale);
+
+  if (camera.zoom * levelScale > 0.5 && level < 10) {
+    drawLayer(level + 1); // deeper zoom
+  }
+}
+
+// Main loop
 function draw() {
   ctx.clearRect(0, 0, width, height);
   ctx.save();
-  ctx.translate(offsetX, offsetY);
-  ctx.scale(zoom, zoom);
+  ctx.translate(camera.x, camera.y);
+  ctx.scale(camera.zoom, camera.zoom);
 
-  layers.forEach(layer => {
-    const img = layer.img;
-    const layerScale = layer.scale;
-
-    if (!img.complete) return;
-
-    // Draw multiple copies for seamless effect
-    const w = img.width * layerScale;
-    const h = img.height * layerScale;
-    for (let x=-2; x<=2; x++) {
-      for (let y=-2; y<=2; y++) {
-        ctx.drawImage(img, x*w - w/2, y*h - h/2, w, h);
-      }
-    }
-  });
+  drawLayer(0);
 
   ctx.restore();
   requestAnimationFrame(draw);
